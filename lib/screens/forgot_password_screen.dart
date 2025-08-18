@@ -68,7 +68,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 controller: _emailController,
                 validator: FormValidators.validateEmail,
                 prefixIcon: Icons.email_outlined,
-                labelText: 'Email',         
+                labelText: 'Email',   
+                textInputAction: TextInputAction.done,      
               ),
               SizedBox(height: 30),
               SizedBox(

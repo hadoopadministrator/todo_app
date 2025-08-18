@@ -96,6 +96,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       : Icons.visibility,
                   obscureText: _obscurePassword.value,
                   onSuffixIconTap: _togglePasswordVisibility,
+                  textInputAction: TextInputAction.done, 
                 ),
               ),
               SizedBox(height: 6),

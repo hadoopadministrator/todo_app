@@ -125,6 +125,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       : Icons.visibility,
                   obscureText: _obscurePassword.value,
                   onSuffixIconTap: _togglePasswordVisibility,
+                  textInputAction: TextInputAction.done, 
                 ),
               ),
         

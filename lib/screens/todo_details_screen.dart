@@ -12,43 +12,79 @@ class TodoDetailsScreen extends StatelessWidget {
     return CustomScaffold(
       automaticallyImplyLeading: true,
       title: "ToDo Details",
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 40),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              "Title: ${toDoModel.title}",
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
-                decoration: toDoModel.isChecked
-                    ? TextDecoration.lineThrough
-                    : TextDecoration.none,
-                decorationColor: Colors.black,
-                decorationThickness: 2,
+            Card(
+              color: toDoModel.isChecked ? Colors.grey.shade300 : Colors.white,
+              elevation: 3,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
               ),
-              maxLines: 2,
+              margin: const EdgeInsets.only(bottom: 20),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  "Title: ${toDoModel.title}",
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 24,
+                    color: toDoModel.isChecked ? Colors.grey : Colors.black,
+                    decoration: toDoModel.isChecked
+                        ? TextDecoration.lineThrough
+                        : TextDecoration.none,
+                    decorationColor: Colors.black,
+                    decorationThickness: 2,
+                  ),
+                  maxLines: 3,
+                ),
+              ),
+            ),
+            Card(
+              color: Colors.white,
+              elevation: 3,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              margin: const EdgeInsets.only(bottom: 20),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  "Description: ${toDoModel.description}",
+                  style: TextStyle(fontSize: 18),
+                ),
+              ),
             ),
 
-            const SizedBox(height: 10),
-            Text(
-              "Description: ${toDoModel.description}",
-
-              style: TextStyle(fontWeight: FontWeight.normal, fontSize: 18),
+            Row(
+              children: [
+                const Icon(
+                  Icons.calendar_today_outlined,
+                  size: 16,
+                  color: Colors.grey,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Created: ${DateFormat('dd MMM yyyy, hh:mm a').format(toDoModel.createdDate)}',
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-            Text(
-              'Created Date: ${DateFormat('dd MMM yyyy, hh:mm a').format(toDoModel.createdDate)}',
-              style: TextStyle(fontWeight: FontWeight.normal, fontSize: 14),
-            ),
-            if (toDoModel.isChecked) ...{
-              const SizedBox(height: 10),
-              Text(
-                'Updated Date: ${DateFormat('dd MMM yyyy, hh:mm a').format(toDoModel.updatedDate!)}',
-                style: TextStyle(fontWeight: FontWeight.normal, fontSize: 14),
+            if (toDoModel.isChecked && toDoModel.updatedDate != null) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Icon(Icons.update, size: 16, color: Colors.grey),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Updated: ${DateFormat('dd MMM yyyy, hh:mm a').format(toDoModel.updatedDate!)}',
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                  ),
+                ],
               ),
-            },
+            ],
           ],
         ),
       ),

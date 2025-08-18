@@ -22,29 +22,59 @@ class TodoHomeScreen extends StatefulWidget {
 class _TodoHomeScreenState extends State<TodoHomeScreen> {
   final StreamController<List<ToDoModel>> _todoStreamController =
       StreamController.broadcast();
-  List<ToDoModel> toDoModel = [];
+  final ScrollController _scrollController = ScrollController();
 
   bool _areAllSelected = false;
-  final ScrollController _scrollController = ScrollController();
-  bool _isFabVisible = true;
+  // bool _isFabVisible = true;
+  final ValueNotifier<bool> _isFabVisible = ValueNotifier(true);
+
 
   Future<void> _loadTodosFromDataBase() async {
-    final todos = await DatabaseService.instance.getAllToDos();
-    toDoModel = todos;
-    _todoStreamController.add(todos);
-    _areAllSelected = toDoModel.isNotEmpty && toDoModel.every((todo) => todo.isChecked);
-    debugPrint("toDoModel loaded: ${toDoModel.length}");
+    try {
+      final todos = await DatabaseService.instance.getAllToDos();
+      if (!_todoStreamController.isClosed) {
+        _todoStreamController.add(todos);
+      }
+      _updateAreAllSelected(todos);
+      debugPrint("toDoModel loaded: ${todos.length}");
+    } catch (e) {
+      debugPrint('Error loading todos: $e');
+    }
   }
 
-  void _navigateToLogin() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => LoginScreen()),
-    );
+  void _updateAreAllSelected(List<ToDoModel> todos) {
+    _areAllSelected = todos.isNotEmpty && todos.every((todo) => todo.isChecked);
   }
 
-  void _bottomSheetPop() {
-    Navigator.pop(context);
+  Future<void> _onCheckToggle(ToDoModel todo) async {
+    todo.isChecked = !todo.isChecked;
+    todo.updatedDate = todo.isChecked ? DateTime.now() : null;
+    await DatabaseService.instance.updateToDo(todo);
+    await _loadTodosFromDataBase();
+    debugPrint('currentTodo Todo: ${todo.toJson()}');
+  }
+
+  Future<void> _onDelete(ToDoModel todo) async {
+    try {
+      if (todo.id == null) return;
+      final int deletedId = todo.id!;
+      debugPrint('deletedTodo Todo: ${todo.toJson()}');
+      await DatabaseService.instance.deleteToDo(deletedId);
+      await _loadTodosFromDataBase();
+      debugPrint('deletedId Todo: $deletedId');
+    } catch (e) {
+      debugPrint('Error deleting todo: $e');
+    }
+  }
+
+  Future<void> _toggleSelectAll(List<ToDoModel> currentTodos) async {
+    bool allChecked = currentTodos.every((todo) => todo.isChecked);
+    for (var todo in currentTodos) {
+      todo.isChecked = !allChecked;
+      todo.updatedDate = todo.isChecked ? DateTime.now() : null;
+      await DatabaseService.instance.updateToDo(todo);
+    }
+    await _loadTodosFromDataBase();
   }
 
   void _logout() async {
@@ -54,140 +84,133 @@ class _TodoHomeScreenState extends State<TodoHomeScreen> {
     _navigateToLogin();
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _loadTodosFromDataBase();
+  void _navigateToLogin() {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => LoginScreen()),
+      (route) => false,
+    );
+  }
+
+  void _bottomSheetPop() {
+    Navigator.pop(context);
+  }
+
+  void _configureScrollListener() {
     _scrollController.addListener(() {
       if (_scrollController.position.userScrollDirection ==
           ScrollDirection.reverse) {
-        if (_isFabVisible) {
-          setState(() => _isFabVisible = false);
+        if (_isFabVisible.value) {
+          _isFabVisible.value = false;
         }
       } else if (_scrollController.position.userScrollDirection ==
           ScrollDirection.forward) {
-        if (!_isFabVisible) {
-          setState(() => _isFabVisible = true);
+        if (!_isFabVisible.value) {
+          _isFabVisible.value = true;
         }
       }
     });
   }
 
   @override
+  void initState() {
+    super.initState();
+    _loadTodosFromDataBase();
+    _configureScrollListener();
+  }
+
+  @override
   void dispose() {
     _todoStreamController.close();
     _scrollController.dispose();
-    DatabaseService.instance.close();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return CustomScaffold(
-      actions: [
-        IconButton(
-          onPressed: () async {
-            bool allChecked = toDoModel.every((todo) => todo.isChecked);
-            for (var todo in toDoModel) {
-              todo.isChecked = !allChecked;
-              todo.updatedDate = todo.isChecked ? DateTime.now() : null;
-              await DatabaseService.instance.updateToDo(todo);
-            }
-            _areAllSelected = !allChecked;
-            _loadTodosFromDataBase();
-            setState(() {});
-          },
-          icon: Icon(
-            _areAllSelected
-                ? Icons.check_box_outlined
-                : Icons.check_box_outline_blank,
-            color: _areAllSelected ? Colors.green : Colors.black,
-            size: 28,
-          ),
-        ),
-
-        IconButton(
-          onPressed: () async {
-            _logout();
-          },
-          icon: Icon(Icons.logout_outlined, color: Colors.black, size: 32),
-        ),
-      ],
-      title: 'Hi ${widget.name}, ToDo App',
-      floatingActionButton: AnimatedSlide(
-        offset: _isFabVisible ? Offset.zero : Offset(0, 2),
-        duration: Duration(milliseconds: 500),
-        curve: Curves.easeInOut,
-        child: FloatingActionButton(
-          backgroundColor: Colors.green,
-          foregroundColor: Colors.white,
-          elevation: 10,
-          onPressed: () {
-            _showBottomSheet(context);
-          },
-          child: const Icon(Icons.add),
-        ),
-      ),
-      child: StreamBuilder<List<ToDoModel>>(
-        stream: _todoStreamController.stream,
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(
-              child: CircularProgressIndicator(
-                backgroundColor: Colors.white,
-                color: Colors.green,
-              ),
-            );
-          }
-          final todos = snapshot.data!;
-          if (todos.isEmpty) {
-            return Center(
-              child: Text(
-                'Welcome ${widget.name} to ToDo!\n\nNo tasks added yet!',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-              ),
-            );
-          }
-          return ListView.builder(
-            controller: _scrollController,
-            padding: EdgeInsets.only(bottom: 80),
-            itemCount: todos.length,
-            itemBuilder: (context, index) {
-              return ToDoCard(
-                onTapCheck: () async {
-                  final currentTodo = todos[index];
-                  currentTodo.isChecked = !currentTodo.isChecked;
-                  currentTodo.updatedDate = currentTodo.isChecked
-                      ? DateTime.now()
-                      : null;
-                  await DatabaseService.instance.updateToDo(currentTodo);
-                  _loadTodosFromDataBase();
-                  _areAllSelected = todos.isNotEmpty && todos.every((todo) => todo.isChecked);
-                  setState(() {});
-                  debugPrint('currentTodo Todo: ${currentTodo.toJson()}');
-                },
-                toDoModel: todos[index],
-                onTapDelete: () async {
-                  final int deletedId = todos[index].id!;
-                  debugPrint('deletedTodo Todo: ${todos[index].toJson()}');
-                  await DatabaseService.instance.deleteToDo(deletedId);
-                  _loadTodosFromDataBase();
-                  debugPrint('deletedId Todo: $deletedId');
-                },
-                onTapEdit: () {
-                  _showBottomSheet(
-                    context,
-                    isEdit: true,
-                    toDoItem: todos[index],
-                    position: index,
-                  );
-                },
-              );
-            },
+    return StreamBuilder(
+      stream: _todoStreamController.stream,
+      builder: (context, asyncSnapshot) {
+        if (asyncSnapshot.connectionState == ConnectionState.waiting) {
+          return Center(
+            child: CircularProgressIndicator(
+              backgroundColor: Colors.white,
+              color: Colors.green,
+            ),
           );
-        },
-      ),
+        }
+
+        final todos = asyncSnapshot.data ?? [];
+        return CustomScaffold(
+          actions: [
+            IconButton(
+              onPressed: () => _toggleSelectAll(todos),
+              icon: Icon(
+                _areAllSelected
+                    ? Icons.check_box_outlined
+                    : Icons.check_box_outline_blank,
+                color: _areAllSelected ? Colors.green : Colors.black,
+                size: 28,
+              ),
+            ),
+
+            IconButton(
+              onPressed: _logout,
+              icon: Icon(Icons.logout_outlined, color: Colors.black, size: 32),
+            ),
+          ],
+          title: 'ToDo App',
+          floatingActionButton: ValueListenableBuilder(
+            valueListenable: _isFabVisible,
+            builder: (context, isVisible, child) {
+              return AnimatedSlide(
+                offset: isVisible ? Offset.zero : Offset(0, 1),
+                duration: Duration(milliseconds: 500),
+                curve: Curves.easeInOut,
+                child:  isVisible ? FloatingActionButton(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  elevation: 10,
+                  onPressed: () {
+                    _showBottomSheet(context);
+                  },
+                  child: const Icon(Icons.add),
+                ) : const SizedBox.shrink(),
+              );
+            }
+          ),
+
+          child: todos.isEmpty
+              ? Center(
+                  child: Text(
+                    'Welcome ${widget.name} to ToDo App!\nNo tasks added yet!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                  ),
+                )
+              : ListView.builder(
+                  controller: _scrollController,
+                  padding: EdgeInsets.only(bottom: 80),
+                  itemCount: todos.length,
+                  itemBuilder: (context, index) {
+                    final todo = todos[index];
+                    return ToDoCard(
+                      onTapCheck: () => _onCheckToggle(todo),
+                      toDoModel: todo,
+                      onTapDelete: () => _onDelete(todo),
+                      onTapEdit: () {
+                        _showBottomSheet(
+                          context,
+                          isEdit: true,
+                          toDoItem: todo,
+                          // position: index,
+                        );
+                      },
+                    );
+                  },
+                ),
+        );
+      },
     );
   }
 
@@ -195,7 +218,7 @@ class _TodoHomeScreenState extends State<TodoHomeScreen> {
     BuildContext context, {
     bool isEdit = false,
     ToDoModel? toDoItem,
-    int? position,
+    // int? position,
   }) {
     TextEditingController titleController = TextEditingController();
     TextEditingController descriptionController = TextEditingController();
@@ -221,8 +244,9 @@ class _TodoHomeScreenState extends State<TodoHomeScreen> {
         ),
       ),
       backgroundColor: Colors.white,
-      isDismissible: false,
+      isDismissible: true,
       isScrollControlled: true,
+      enableDrag: true,
       builder: (context) {
         return Padding(
           padding: EdgeInsets.only(
@@ -251,6 +275,7 @@ class _TodoHomeScreenState extends State<TodoHomeScreen> {
                   labelText: 'Description',
                   controller: descriptionController,
                   maxLines: 2,
+                  textInputAction: TextInputAction.done,
                 ),
                 const SizedBox(height: 20),
 
@@ -299,35 +324,15 @@ class _TodoHomeScreenState extends State<TodoHomeScreen> {
                   onPressed: () async {
                     final title = titleController.text.trim();
                     final description = descriptionController.text.trim();
+
                     if (title.isNotEmpty && description.isNotEmpty) {
-                      if (isEdit && position != null) {
-                        final existing = toDoModel[position];
-                        existing.title = title;
-                        existing.description = description;
-                        existing.todoItemColor = selectedColor;
-                        existing.updatedDate = DateTime.now();
-                        await DatabaseService.instance.updateToDo(existing);
-                        _loadTodosFromDataBase();
-                        debugPrint('Updated Todo: ${existing.toJson()}');
+                      if (isEdit && toDoItem != null) {
+                        _editTodo(toDoItem, title, description, selectedColor);
                       } else {
-                        final newTodo = ToDoModel(
-                          isChecked: false,
-                          title: title,
-                          description: description,
-                          createdDate: DateTime.now(),
-                          todoItemColor: selectedColor,
-                        );
-                        final int id = await DatabaseService.instance
-                            .insertToDo(newTodo);
-                        newTodo.id = id;
-                        _loadTodosFromDataBase();
-                        _areAllSelected =
-                            toDoModel.isNotEmpty &&
-                            toDoModel.every((todo) => todo.isChecked);
-                        debugPrint('Added Todo: ${newTodo.toJson()}');
+                        _addTodo(title, description, selectedColor);
                       }
                     } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      ScaffoldMessenger.of(this.context).showSnackBar(
                         SnackBar(
                           content: Text("Title and description can't be empty"),
                         ),
@@ -344,5 +349,37 @@ class _TodoHomeScreenState extends State<TodoHomeScreen> {
         );
       },
     );
+  }
+
+  Future<void> _addTodo(
+    String title,
+    String description,
+    Color? selectedColor,
+  ) async {
+    final newTodo = ToDoModel(
+      isChecked: false,
+      title: title,
+      description: description,
+      createdDate: DateTime.now(),
+      todoItemColor: selectedColor,
+    );
+    final int id = await DatabaseService.instance.insertToDo(newTodo);
+    newTodo.id = id;
+    _loadTodosFromDataBase();
+  }
+
+  Future<void> _editTodo(
+    ToDoModel todo,
+    String title,
+    String description,
+    Color? selectedColor,
+  ) async {
+    todo.title = title;
+    todo.description = description;
+    todo.todoItemColor = selectedColor;
+    todo.updatedDate = DateTime.now();
+    await DatabaseService.instance.updateToDo(todo);
+    _loadTodosFromDataBase();
+    debugPrint('Updated Todo: ${todo.toJson()}');
   }
 }
