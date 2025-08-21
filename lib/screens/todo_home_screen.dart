@@ -24,8 +24,7 @@ class _TodoHomeScreenState extends State<TodoHomeScreen> {
       StreamController.broadcast();
   final ScrollController _scrollController = ScrollController();
 
-  bool _areAllSelected = false;
-  // bool _isFabVisible = true;
+  final ValueNotifier<bool> _areAllSelected = ValueNotifier(false);
   final ValueNotifier<bool> _isFabVisible = ValueNotifier(true);
 
 
@@ -43,7 +42,7 @@ class _TodoHomeScreenState extends State<TodoHomeScreen> {
   }
 
   void _updateAreAllSelected(List<ToDoModel> todos) {
-    _areAllSelected = todos.isNotEmpty && todos.every((todo) => todo.isChecked);
+    _areAllSelected.value = todos.isNotEmpty && todos.every((todo) => todo.isChecked);
   }
 
   Future<void> _onCheckToggle(ToDoModel todo) async {
@@ -123,6 +122,8 @@ class _TodoHomeScreenState extends State<TodoHomeScreen> {
   void dispose() {
     _todoStreamController.close();
     _scrollController.dispose();
+    _areAllSelected.dispose();
+    _isFabVisible.dispose();
     super.dispose();
   }
 
@@ -132,10 +133,12 @@ class _TodoHomeScreenState extends State<TodoHomeScreen> {
       stream: _todoStreamController.stream,
       builder: (context, asyncSnapshot) {
         if (asyncSnapshot.connectionState == ConnectionState.waiting) {
-          return Center(
-            child: CircularProgressIndicator(
-              backgroundColor: Colors.white,
-              color: Colors.green,
+          return CustomScaffold(
+            child: Center(
+              child: CircularProgressIndicator(
+                backgroundColor: Colors.white,
+                color: Colors.green,
+              ),
             ),
           );
         }
@@ -143,15 +146,20 @@ class _TodoHomeScreenState extends State<TodoHomeScreen> {
         final todos = asyncSnapshot.data ?? [];
         return CustomScaffold(
           actions: [
-            IconButton(
-              onPressed: () => _toggleSelectAll(todos),
-              icon: Icon(
-                _areAllSelected
-                    ? Icons.check_box_outlined
-                    : Icons.check_box_outline_blank,
-                color: _areAllSelected ? Colors.green : Colors.black,
-                size: 28,
-              ),
+            ValueListenableBuilder<bool>(
+              valueListenable: _areAllSelected,
+              builder: (context, allSelected, _) {
+                return IconButton(
+                  onPressed: () => _toggleSelectAll(todos),
+                  icon: Icon(
+                    allSelected
+                        ? Icons.check_box_outlined
+                        : Icons.check_box_outline_blank,
+                    color: allSelected ? Colors.green : Colors.black,
+                    size: 28,
+                  ),
+                );
+              }
             ),
 
             IconButton(
@@ -203,7 +211,7 @@ class _TodoHomeScreenState extends State<TodoHomeScreen> {
                           context,
                           isEdit: true,
                           toDoItem: todo,
-                          // position: index,
+                          
                         );
                       },
                     );

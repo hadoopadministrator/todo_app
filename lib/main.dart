@@ -25,6 +25,7 @@ class MyApp extends StatelessWidget {
     // Navigate to login screen or home screen based on saved login state
 
     return GetMaterialApp(
+      debugShowCheckedModeBanner: false,
       home:  isLogin ? TodoHomeScreen(name: name) : LoginScreen(),
     );
   }
